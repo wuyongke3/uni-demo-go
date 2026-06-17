@@ -1,0 +1,17 @@
+# UniGo 配置文件
+# 修改此文件后重启服务即可生效
+
+server:
+  port: "8000" # 服务端口
+
+database:
+  driver: "mysql" # 数据库类型: mysql / postgresql
+  host: "localhost" # 数据库地址
+  port: 3306 # 数据库端口 (MySQL:3306, PostgreSQL:5432)
+  user: "root" # 用户名
+  password: "" # 密码
+  dbname: "unigo" # 数据库名
+
+
+# 指定配置文件路径 (可选):
+#   CONFIG_PATH=/etc/unigo/config.yaml ./unigo
