@@ -174,12 +174,32 @@ type LecturerRepo struct {
 
 func NewLecturerRepo() *LecturerRepo { return &LecturerRepo{NewBaseRepository[lecturer.Lecturer]()} }
 
+// FindByNo 根据讲师编号查询 (用于登录)
+func (r *LecturerRepo) FindByNo(no string) (*lecturer.Lecturer, error) {
+	var entity lecturer.Lecturer
+	err := database.DB.Where("no = ?", no).First(&entity).Error
+	if err != nil {
+		return nil, err
+	}
+	return &entity, nil
+}
+
 // StudentRepo 学员仓储
 type StudentRepo struct {
 	*baseRepository[student.Student]
 }
 
 func NewStudentRepo() *StudentRepo { return &StudentRepo{NewBaseRepository[student.Student]()} }
+
+// FindByNo 根据学员编号查询 (用于登录)
+func (r *StudentRepo) FindByNo(no string) (*student.Student, error) {
+	var entity student.Student
+	err := database.DB.Where("no = ?", no).First(&entity).Error
+	if err != nil {
+		return nil, err
+	}
+	return &entity, nil
+}
 
 // CourseRepo 课程仓储
 type CourseRepo struct{ *baseRepository[course.Course] }

@@ -37,8 +37,8 @@ func main() {
 	// 4. 创建 Gin 引擎
 	r := gin.Default()
 
-	// 5. 注册路由
-	router.SetupRouter(r)
+	// 5. 注册路由 (传入 JWT 配置)
+	router.SetupRouter(r, cfg.JWT)
 
 	// 6. 启动服务
 	addr := ":" + cfg.Server.Port

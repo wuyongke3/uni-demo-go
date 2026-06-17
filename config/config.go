@@ -13,12 +13,25 @@ import (
 type Config struct {
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
+	JWT      JWTConfig      `yaml:"jwt"`
 }
 
 // ServerConfig 服务器配置
 type ServerConfig struct {
 	Port string `yaml:"port"`
 }
+
+// JWTConfig JWT 配置
+type JWTConfig struct {
+	Secret     string `yaml:"secret"`      // 签名密钥
+	ExpireHour int    `yaml:"expire_hour"` // Token 过期时间 (小时)
+}
+
+// GetSecret 实现 middleware.JWTConfigInterface
+func (j JWTConfig) GetSecret() string { return j.Secret }
+
+// GetExpireHour 实现 middleware.JWTConfigInterface
+func (j JWTConfig) GetExpireHour() int { return j.ExpireHour }
 
 // DatabaseConfig 数据库配置 (支持 MySQL / PostgreSQL)
 type DatabaseConfig struct {
@@ -42,6 +55,10 @@ func Load() *Config {
 		Database: DatabaseConfig{
 			Driver: "mysql", Host: "localhost", Port: 3306,
 			User: "root", Password: "", DBName: "unigo",
+		},
+		JWT: JWTConfig{
+			Secret:     "unigo-jwt-secret-key-2024", // 默认密钥，生产环境请修改
+			ExpireHour: 24,                          // 默认 24 小时过期
 		},
 	}
 
