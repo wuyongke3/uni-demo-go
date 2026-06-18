@@ -19,71 +19,45 @@ import (
 //  第一部分：自动建表初始化机制
 // ============================================================
 
-// tableRegistry 所有需要自动建表的模型注册表
-var tableRegistry = []struct {
-	name  string // 表名 (用于日志)
-	model any    // GORM 模型实例
-}{
-	{"lecturers", &lecturer.Lecturer{}},
-	{"students", &student.Student{}},
-	{"courses", &course.Course{}},
-	{"class_schedules", &class_schedule.ClassSchedule{}},
-	{"classrooms", &classroom.Classroom{}},
-	{"exams", &exam.Exam{}},
-	{"exam_papers", &exam_paper.ExamPaper{}},
-	{"feedbacks", &feedback.Feedback{}},
-	{"admins", &admin.Admin{}},
-}
-
-// AutoMigrate 自动建表初始化
+// AutoMigrate 自动建表/字段同步
 //
 // 执行流程:
 //  1. Ping 数据库，验证连接可用性
-//  2. 遍历 tableRegistry，逐张检查表是否存在
-//  3. 不存在 → CreateTable 建表（含索引/约束）
-//  4. 已存在   → 跳过，不做任何修改
+//  2. 遍历所有模型，调用 GORM AutoMigrate
+//     - 表不存在 → 自动创建（含主键/索引/约束）
+//     - 表已存在但缺列 → 自动添加新列（不删除/修改已有字段）
 //
-// 保证幂等性: 无论执行多少次，结果一致；不会删除或修改已有数据/字段。
+// 保证幂等性: 无论执行多少次，结果一致；不会删除已有数据或字段。
 func AutoMigrate() error {
 	db := database.DB
 
-	// Step 1: 检查数据库连接是否可用 (Ping)
+	// Step 1: 检查数据库连接是否可用
 	sqlDB, err := db.DB()
 	if err != nil {
 		return fmt.Errorf("获取底层连接失败: %w", err)
 	}
 	if err := sqlDB.Ping(); err != nil {
-		return fmt.Errorf("数据库连接不可用 (请检查 DB_HOST/DB_PORT/DB_USER/DB_PASSWORD): %w", err)
+		return fmt.Errorf("数据库连接不可用: %w", err)
 	}
 
-	log.Println("[Migration] 数据库连接验证通过，开始检查表结构...")
+	log.Println("[Migration] 数据库连接验证通过，开始同步表结构...")
 
-	var createdCount int
-	var skippedCount int
-
-	for _, entry := range tableRegistry {
-		migrator := db.Migrator()
-
-		// 检查表是否已存在
-		exists := migrator.HasTable(entry.model)
-
-		if exists {
-			log.Printf("[Migration] %-20s 已存在，跳过", entry.name)
-			skippedCount++
-			continue
-		}
-
-		// 表不存在，执行建表 (自动创建主键/索引/唯一约束等)
-		if createErr := migrator.CreateTable(entry.model); createErr != nil {
-			return fmt.Errorf("创建表 [%s] 失败: %w", entry.name, createErr)
-		}
-		log.Printf("[Migration] %-20s 创建成功 ✓", entry.name)
-		createdCount++
+	// Step 2: 使用 AutoMigrate 自动同步（建表 + 添加缺失列）
+	if err := db.AutoMigrate(
+		&lecturer.Lecturer{},
+		&student.Student{},
+		&course.Course{},
+		&class_schedule.ClassSchedule{},
+		&classroom.Classroom{},
+		&exam.Exam{},
+		&exam_paper.ExamPaper{},
+		&feedback.Feedback{},
+		&admin.Admin{},
+	); err != nil {
+		return fmt.Errorf("表结构同步失败: %w", err)
 	}
 
-	log.Printf("[Migration] 初始化完成: 新建 %d 张表，跳过 %d 张已存在的表",
-		createdCount, skippedCount)
-
+	log.Println("[Migration] 表结构同步完成 ✓")
 	return nil
 }
 
@@ -184,6 +158,16 @@ func (r *LecturerRepo) FindByNo(no string) (*lecturer.Lecturer, error) {
 	return &entity, nil
 }
 
+// FindByName 根据讲师姓名查询 (用于登录)
+func (r *LecturerRepo) FindByName(name string) (*lecturer.Lecturer, error) {
+	var entity lecturer.Lecturer
+	err := database.DB.Where("name = ?", name).First(&entity).Error
+	if err != nil {
+		return nil, err
+	}
+	return &entity, nil
+}
+
 // StudentRepo 学员仓储
 type StudentRepo struct {
 	*baseRepository[student.Student]
@@ -195,6 +179,16 @@ func NewStudentRepo() *StudentRepo { return &StudentRepo{NewBaseRepository[stude
 func (r *StudentRepo) FindByNo(no string) (*student.Student, error) {
 	var entity student.Student
 	err := database.DB.Where("no = ?", no).First(&entity).Error
+	if err != nil {
+		return nil, err
+	}
+	return &entity, nil
+}
+
+// FindByName 根据学员姓名查询 (用于登录)
+func (r *StudentRepo) FindByName(name string) (*student.Student, error) {
+	var entity student.Student
+	err := database.DB.Where("name = ?", name).First(&entity).Error
 	if err != nil {
 		return nil, err
 	}

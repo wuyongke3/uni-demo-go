@@ -115,7 +115,12 @@ func (h *CRUDEntity[T]) Info(c *gin.Context) {
 func (h *CRUDEntity[T]) Add(c *gin.Context) {
 	var entity T
 	if err := c.ShouldBindJSON(&entity); err != nil {
-		response.BadRequest(c, formatValidationError(err))
+		code, msg, details := formatValidationError(err)
+		if details != nil {
+			response.FailWithDetails(c, code, msg, details)
+		} else {
+			response.FailWithMessage(c, code, msg)
+		}
 		return
 	}
 	result, err := h.SVC.Create(&entity)
@@ -135,7 +140,12 @@ func (h *CRUDEntity[T]) Modify(c *gin.Context) {
 	}
 	var entity T
 	if err := c.ShouldBindJSON(&entity); err != nil {
-		response.BadRequest(c, formatValidationError(err))
+		code, msg, details := formatValidationError(err)
+		if details != nil {
+			response.FailWithDetails(c, code, msg, details)
+		} else {
+			response.FailWithMessage(c, code, msg)
+		}
 		return
 	}
 	result, err := h.SVC.Update(id, &entity)
@@ -289,25 +299,43 @@ func compareValues(a, b reflect.Value) int {
 	}
 }
 
-// formatValidationError 格式化校验错误信息 (中文友好)
-func formatValidationError(err error) string {
+// formatValidationError 格式化校验错误为结构化字段级错误
+//
+// 返回值: (业务错误码, 概要消息, 字段错误详情列表)
+func formatValidationError(err error) (int, string, []response.FieldError) {
 	if ve, ok := err.(validator.ValidationErrors); ok {
+		details := make([]response.FieldError, 0, len(ve))
 		for _, e := range ve {
+			fe := response.FieldError{Field: e.Field()}
 			switch e.Tag() {
 			case "required":
-				return "字段 [" + e.Field() + "] 为必填项"
+				fe.Message = "该字段为必填项"
 			case "min":
-				return "字段 [" + e.Field() + "] 最小值为 " + e.Param()
+				if _, isNum := e.Value().(float64); isNum || e.Type().Kind() == reflect.Int || e.Type().Kind() == reflect.Int64 {
+					fe.Message = "最小值为 " + e.Param()
+				} else {
+					fe.Message = "最小长度为 " + e.Param() + " 个字符"
+				}
 			case "max":
-				return "字段 [" + e.Field() + "] 最大长度/值为 " + e.Param()
+				if _, isNum := e.Value().(float64); isNum || e.Type().Kind() == reflect.Int || e.Type().Kind() == reflect.Int64 {
+					fe.Message = "最大值为 " + e.Param()
+				} else {
+					fe.Message = "最大长度为 " + e.Param() + " 个字符"
+				}
 			case "oneof":
-				return "字段 [" + e.Field() + "] 必须是以下值之一: " + e.Param()
+				fe.Message = "必须是以下值之一: " + e.Param()
 			case "url":
-				return "字段 [" + e.Field() + "] 必须是合法的URL"
+				fe.Message = "必须填写合法的 URL"
+			case "email":
+				fe.Message = "邮箱格式不正确"
 			default:
-				return "字段 [" + e.Field() + "] 校验失败: " + e.Tag()
+				fe.Message = "校验失败: " + e.Tag()
 			}
+			details = append(details, fe)
 		}
+		return 40001, "参数校验失败", details
 	}
-	return "参数格式错误: " + err.Error()
+
+	// 非 validator 错误 (如 JSON 解析失败)
+	return 40003, "请求参数格式错误: " + err.Error(), nil
 }

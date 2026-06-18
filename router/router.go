@@ -44,12 +44,12 @@ func SetupRouter(r *gin.Engine, cfg config.JWTConfig) {
 
 	// 全局 CORS 中间件 (允许跨域)
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"}, // 允许所有来源 (生产环境请限定域名)
+		AllowAllOrigins:  true, // 允许所有来源
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * 3600, // 预检请求缓存 12 小时
+		AllowCredentials: false, // AllowAllOrigins=true 时必须为 false
+		MaxAge:           12 * 3600,
 	}))
 
 	// ============================================================

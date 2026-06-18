@@ -1,9 +1,11 @@
 package middleware
 
 import (
-	"net/http"
 	"strings"
 	"time"
+
+	"unigo/errorcode"
+	"unigo/response"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -28,10 +30,7 @@ func JWTAuth(cfg JWTConfigInterface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"code":    401,
-				"message": "未登录，请先登录",
-			})
+			response.Fail(c, errorcode.Unauthorized)
 			c.Abort()
 			return
 		}
@@ -39,10 +38,7 @@ func JWTAuth(cfg JWTConfigInterface) gin.HandlerFunc {
 		// 格式: Bearer <token>
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"code":    401,
-				"message": "认证格式错误，格式: Bearer <token>",
-			})
+			response.Fail(c, errorcode.TokenFormatInvalid)
 			c.Abort()
 			return
 		}
@@ -52,10 +48,7 @@ func JWTAuth(cfg JWTConfigInterface) gin.HandlerFunc {
 		// 解析并验证 Token
 		claims, err := parseToken(tokenString, cfg.GetSecret())
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"code":    401,
-				"message": "Token 已过期或无效，请重新登录",
-			})
+			response.Fail(c, errorcode.TokenExpired)
 			c.Abort()
 			return
 		}

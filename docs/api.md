@@ -48,14 +48,50 @@
 }
 ```
 
-**错误响应：**
+**错误响应（业务错误）：**
 
 ```json
 {
-  "code": 400,
-  "message": "字段 [name] 为必填项"
+  "code": 60001,
+  "message": "账号或密码错误"
 }
 ```
+
+**错误响应（参数校验失败，含字段级详情）：**
+
+```json
+{
+  "code": 40001,
+  "message": "参数校验失败",
+  "details": [
+    { "field": "Name", "message": "该字段为必填项" },
+    { "field": "Password", "message": "最小长度为 6 个字符" }
+  ]
+}
+```
+
+**完整错误码表：**
+
+| 错误码      | 类别         | 说明                   |
+| ----------- | ------------ | ---------------------- |
+| `0`         | 成功         | 操作成功               |
+| `10001`     | 系统错误     | 系统内部异常           |
+| `20001`     | 认证错误     | 未登录 (无Token)       |
+| `20002`     | 认证错误     | Token 格式错误         |
+| `20003`     | 认证错误     | Token 已过期或无效     |
+| `30001`     | 数据错误     | 资源不存在             |
+| **`40001`** | **参数错误** | **参数校验失败(通用)** |
+| **`40002`** | **参数错误** | **必填字段缺失**       |
+| **`40003`** | **参数错误** | **字段格式错误**       |
+| **`40004`** | **参数错误** | **字段长度超限**       |
+| `50001`     | 服务错误     | 数据库操作失败         |
+| `50101`     | 服务错误     | 密码处理失败           |
+| `50201`     | 服务错误     | Token 生成失败         |
+| `60001`     | 业务错误     | 账号或密码错误         |
+| `60002`     | 业务错误     | 注册失败               |
+| `60003`     | 业务错误     | 编号已被注册           |
+
+> **设计原则：** HTTP 状态码统一返回 `200`，通过 `code` 字段区分成功/失败。前端只需判断 `code === 0` 即可。
 
 ---
 
@@ -72,7 +108,6 @@ POST /api/v1/auth/lecturer/register
 Content-Type: application/json
 
 {
-  "no": "T001",        // 讲师编号 (唯一)
   "name": "张老师",    // 姓名
   "password": "123456" // 密码 (6-30位)
 }
@@ -92,7 +127,7 @@ Content-Type: application/json
 }
 ```
 
-**错误：** 编号已存在 → `{"code": 400, "message": "该编号已被注册"}`
+> **编号规则：** 服务端自动生成，格式 `T` + 8位序号（如 T00000001、T00000042）
 
 #### POST /auth/student/register - 学员注册 (公开)
 
@@ -101,7 +136,6 @@ POST /api/v1/auth/student/register
 Content-Type: application/json
 
 {
-  "no": "S001",        // 学员编号 (唯一)
   "name": "李同学",    // 姓名
   "password": "123456" // 密码 (6-30位)
 }
@@ -121,6 +155,8 @@ Content-Type: application/json
 }
 ```
 
+> **编号规则：** 服务端自动生成，格式 `S` + 8位序号（如 S00000001、S00000042）
+
 #### POST /auth/lecturer/login - 讲师登录 (公开)
 
 ```bash
@@ -128,7 +164,7 @@ POST /api/v1/auth/lecturer/login
 Content-Type: application/json
 
 {
-  "no": "T001",       // 讲师编号
+  "name": "张老师",    // 姓名 (登录账号)
   "password": "123456" // 密码
 }
 ```
@@ -142,7 +178,7 @@ Content-Type: application/json
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIs...",
     "user_id": 1,
-    "username": "T001",
+    "username": "张老师",
     "role": "lecturer",
     "user_info": {
       "id": 1,
@@ -160,7 +196,7 @@ POST /api/v1/auth/student/login
 Content-Type: application/json
 
 {
-  "no": "S001",       // 学员编号
+  "name": "李同学",    // 姓名 (登录账号)
   "password": "123456" // 密码
 }
 ```
@@ -174,7 +210,7 @@ Content-Type: application/json
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIs...",
     "user_id": 1,
-    "username": "S001",
+    "username": "李同学",
     "role": "student",
     "user_info": {
       "id": 1,
@@ -220,7 +256,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 
 ```json
 {
-  "code": 401,
+  "code": 20001,
   "message": "未登录，请先登录"
 }
 ```
@@ -397,8 +433,9 @@ Content-Type: application/json
 
 ```json
 {
-  "code": 400,
-  "message": "字段 [name] 为必填项"
+  "code": 40001,
+  "message": "参数校验失败",
+  "details": [{ "field": "Name", "message": "该字段为必填项" }]
 }
 ```
 
@@ -554,8 +591,8 @@ DELETE /api/v1/lecturers/delete/1,2,3
 | 字段          | 类型   | 必填 | 说明                           |
 | ------------- | ------ | ---- | ------------------------------ |
 | `type`        | string | 是   | 类型: schedule/course          |
-| `course_id`   | uint   | 否*  | 课程 ID (type=course 时必填)   |
-| `schedule_id` | uint   | 否*  | 课表 ID (type=schedule 时必填) |
+| `course_id`   | uint   | 否\* | 课程 ID (type=course 时必填)   |
+| `schedule_id` | uint   | 否\* | 课表 ID (type=schedule 时必填) |
 | `student_id`  | uint   | 是   | 学员 ID                        |
 | `score`       | float  | 否   | 分数 (0-100)                   |
 | `paper_id`    | uint   | 否   | 试卷 ID                        |

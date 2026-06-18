@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 
+	"unigo/database"
+	"unigo/errorcode"
 	"unigo/middleware"
 	"unigo/model/lecturer"
 	"unigo/model/student"
@@ -15,13 +18,12 @@ import (
 
 // LoginRequest 登录请求体
 type LoginRequest struct {
-	No       string `json:"no" binding:"required"`             // 编号 (讲师编号/学员编号)
+	Name     string `json:"name" binding:"required,max=50"`    // 姓名 (登录账号)
 	Password string `json:"password" binding:"required,min=6"` // 密码
 }
 
 // RegisterRequest 注册请求体 (通用)
 type RegisterRequest struct {
-	No       string `json:"no" binding:"required,max=30"`             // 编号
 	Name     string `json:"name" binding:"required,max=50"`           // 姓名
 	Password string `json:"password" binding:"required,min=6,max=30"` // 密码
 }
@@ -49,28 +51,33 @@ func NewAuthHandler(cfg middleware.JWTConfigInterface) *AuthHandler {
 func (h *AuthHandler) LecturerLogin(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, formatValidationError(err))
+		code, msg, details := formatValidationError(err)
+		if details != nil {
+			response.FailWithDetails(c, code, msg, details)
+		} else {
+			response.FailWithMessage(c, code, msg)
+		}
 		return
 	}
 
 	repo := repository.NewLecturerRepo()
-	user, err := repo.FindByNo(req.No)
+	user, err := repo.FindByName(req.Name)
 	if err != nil || user == nil {
-		response.BadRequest(c, "账号或密码错误")
+		response.Fail(c, errorcode.LoginFailed)
 		return
 	}
 
 	if !checkPassword(req.Password, user.Password) {
-		response.BadRequest(c, "账号或密码错误")
+		response.Fail(c, errorcode.LoginFailed)
 		return
 	}
 
 	token, err := middleware.GenerateToken(
-		user.ID, "lecturer", user.No,
+		user.ID, "lecturer", user.Name,
 		h.JWTConfig.GetSecret(), h.JWTConfig.GetExpireHour(),
 	)
 	if err != nil {
-		response.InternalError(c, "Token 生成失败")
+		response.FailWithMessage(c, errorcode.TokenGenFailed, "Token 生成失败")
 		return
 	}
 
@@ -80,7 +87,7 @@ func (h *AuthHandler) LecturerLogin(c *gin.Context) {
 		Data: LoginResponse{
 			Token:    token,
 			UserID:   user.ID,
-			Username: user.No,
+			Username: user.Name,
 			Role:     "lecturer",
 			UserInfo: lecturerInfo(user),
 		},
@@ -91,28 +98,33 @@ func (h *AuthHandler) LecturerLogin(c *gin.Context) {
 func (h *AuthHandler) StudentLogin(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, formatValidationError(err))
+		code, msg, details := formatValidationError(err)
+		if details != nil {
+			response.FailWithDetails(c, code, msg, details)
+		} else {
+			response.FailWithMessage(c, code, msg)
+		}
 		return
 	}
 
 	repo := repository.NewStudentRepo()
-	user, err := repo.FindByNo(req.No)
+	user, err := repo.FindByName(req.Name)
 	if err != nil || user == nil {
-		response.BadRequest(c, "账号或密码错误")
+		response.Fail(c, errorcode.LoginFailed)
 		return
 	}
 
 	if !checkPassword(req.Password, user.Password) {
-		response.BadRequest(c, "账号或密码错误")
+		response.Fail(c, errorcode.LoginFailed)
 		return
 	}
 
 	token, err := middleware.GenerateToken(
-		user.ID, "student", user.No,
+		user.ID, "student", user.Name,
 		h.JWTConfig.GetSecret(), h.JWTConfig.GetExpireHour(),
 	)
 	if err != nil {
-		response.InternalError(c, "Token 生成失败")
+		response.FailWithMessage(c, errorcode.TokenGenFailed, "Token 生成失败")
 		return
 	}
 
@@ -122,7 +134,7 @@ func (h *AuthHandler) StudentLogin(c *gin.Context) {
 		Data: LoginResponse{
 			Token:    token,
 			UserID:   user.ID,
-			Username: user.No,
+			Username: user.Name,
 			Role:     "student",
 			UserInfo: studentInfo(user),
 		},
@@ -150,40 +162,42 @@ func GetCurrentUser(c *gin.Context) {
 func (h *AuthHandler) LecturerRegister(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, formatValidationError(err))
+		code, msg, details := formatValidationError(err)
+		if details != nil {
+			response.FailWithDetails(c, code, msg, details)
+		} else {
+			response.FailWithMessage(c, code, msg)
+		}
 		return
 	}
 
 	repo := repository.NewLecturerRepo()
 
-	// 检查编号是否已存在
-	if existing, _ := repo.FindByNo(req.No); existing != nil {
-		response.BadRequest(c, "该编号已被注册")
-		return
-	}
-
 	// 密码加密
 	hashedPwd, err := HashPassword(req.Password)
 	if err != nil {
-		response.InternalError(c, "密码加密失败")
+		response.FailWithMessage(c, errorcode.EncryptFailed, "密码处理失败")
 		return
 	}
 
-	// 创建讲师记录
+	// 先创建记录获取自增 ID，再生成编号
 	entity := &lecturer.Lecturer{
-		No:       req.No,
 		Name:     req.Name,
 		Password: hashedPwd,
 	}
 	if err = repo.Create(entity); err != nil {
-		response.InternalError(c, "注册失败: "+err.Error())
+		response.FailWithMessage(c, errorcode.RegisterFailed, "注册失败: "+err.Error())
 		return
 	}
+
+	// 生成编号: T + 8位序号 (如 T00000001)
+	entity.No = generateNo("T", entity.ID)
+	database.DB.Model(entity).Update("no", entity.No)
 
 	c.JSON(http.StatusOK, response.Response{
 		Code:    0,
 		Message: "注册成功",
-		Data: lecturerInfo(entity),
+		Data:    lecturerInfo(entity),
 	})
 }
 
@@ -191,40 +205,42 @@ func (h *AuthHandler) LecturerRegister(c *gin.Context) {
 func (h *AuthHandler) StudentRegister(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, formatValidationError(err))
+		code, msg, details := formatValidationError(err)
+		if details != nil {
+			response.FailWithDetails(c, code, msg, details)
+		} else {
+			response.FailWithMessage(c, code, msg)
+		}
 		return
 	}
 
 	repo := repository.NewStudentRepo()
 
-	// 检查编号是否已存在
-	if existing, _ := repo.FindByNo(req.No); existing != nil {
-		response.BadRequest(c, "该编号已被注册")
-		return
-	}
-
 	// 密码加密
 	hashedPwd, err := HashPassword(req.Password)
 	if err != nil {
-		response.InternalError(c, "密码加密失败")
+		response.FailWithMessage(c, errorcode.EncryptFailed, "密码处理失败")
 		return
 	}
 
-	// 创建学员记录
+	// 先创建记录获取自增 ID，再生成编号
 	entity := &student.Student{
-		No:       req.No,
 		Name:     req.Name,
 		Password: hashedPwd,
 	}
 	if err = repo.Create(entity); err != nil {
-		response.InternalError(c, "注册失败: "+err.Error())
+		response.FailWithMessage(c, errorcode.RegisterFailed, "注册失败: "+err.Error())
 		return
 	}
+
+	// 生成编号: S + 8位序号 (如 S00000001)
+	entity.No = generateNo("S", entity.ID)
+	database.DB.Model(entity).Update("no", entity.No)
 
 	c.JSON(http.StatusOK, response.Response{
 		Code:    0,
 		Message: "注册成功",
-		Data: studentInfo(entity),
+		Data:    studentInfo(entity),
 	})
 }
 
@@ -242,6 +258,11 @@ func checkPassword(plain, hashed string) bool {
 func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return string(bytes), err
+}
+
+// generateNo 生成编号: 前缀 + 8位序号 (如 T00000001, S00000042)
+func generateNo(prefix string, id uint) string {
+	return fmt.Sprintf("%s%08d", prefix, id)
 }
 
 // lecturerInfo 提取讲师公开信息 (脱敏)
