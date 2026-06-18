@@ -183,7 +183,7 @@ func (h *AuthHandler) LecturerRegister(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Response{
 		Code:    0,
 		Message: "注册成功",
-		Data:    lecturerInfo(entity),
+		Data: lecturerInfo(entity),
 	})
 }
 
@@ -224,7 +224,7 @@ func (h *AuthHandler) StudentRegister(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Response{
 		Code:    0,
 		Message: "注册成功",
-		Data:    studentInfo(entity),
+		Data: studentInfo(entity),
 	})
 }
 

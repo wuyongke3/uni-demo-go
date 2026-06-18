@@ -14,6 +14,7 @@ import (
 	"unigo/router/lecturer"
 	"unigo/router/student"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -40,6 +41,16 @@ import (
 //	└── /admins                 ★ 需 Token 鉴权
 func SetupRouter(r *gin.Engine, cfg config.JWTConfig) {
 	api := r.Group("/api/v1")
+
+	// 全局 CORS 中间件 (允许跨域)
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"}, // 允许所有来源 (生产环境请限定域名)
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * 3600, // 预检请求缓存 12 小时
+	}))
 
 	// ============================================================
 	//  公开路由 (无需 Token)
