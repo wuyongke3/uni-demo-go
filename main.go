@@ -34,8 +34,11 @@ func main() {
 		log.Fatalf("[FATAL] 数据库迁移失败: %v", err)
 	}
 
-	// 4. 创建 Gin 引擎
-	r := gin.Default()
+	// 4. 创建 Gin 引擎 (手动注册中间件，确保 CORS 最先执行)
+	r := gin.New()
+	r.Use(router.CORSMiddleware()) // ← CORS 必须是第一个中间件
+	r.Use(gin.Logger())
+	r.Use(gin.Recovery())
 
 	// 5. 注册路由 (传入 JWT 配置)
 	router.SetupRouter(r, cfg.JWT)

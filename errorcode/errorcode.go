@@ -19,8 +19,8 @@ const (
 	Success int = 0
 
 	// ── 1xxxx 系统级错误 ──
-	SystemError = 10001 // 系统内部异常
-	ServerPanic = 10002 // 服务宕机
+	SystemError     = 10001 // 系统内部异常
+	ServerPanic     = 10002 // 服务宕机
 
 	// ── 2xxxx 认证鉴权错误 ──
 	Unauthorized       = 20001 // 未登录 (无Token)
@@ -47,37 +47,37 @@ const (
 	TokenGenFailed = 50201 // Token 生成失败
 
 	// ── 6xxxx 业务逻辑错误 ──
-	LoginFailed     = 60001 // 账号或密码错误
-	RegisterFailed  = 60002 // 注册失败 (通用)
-	DuplicateNo     = 60003 // 编号已被注册
-	AccountDisabled = 60004 // 账号已被禁用
+	LoginFailed      = 60001 // 账号或密码错误
+	RegisterFailed   = 60002 // 注册失败 (通用)
+	DuplicateNo      = 60003 // 编号已被注册
+	AccountDisabled  = 60004 // 账号已被禁用
 )
 
 // ErrorMsg 错误码 → 默认中文提示映射
 var ErrorMsg = map[int]string{
-	Success:             "成功",
-	SystemError:         "系统内部异常，请稍后重试",
-	ServerPanic:         "服务内部错误",
-	Unauthorized:        "未登录，请先登录",
-	TokenFormatInvalid:  "认证格式错误，格式: Bearer <token>",
-	TokenExpired:        "Token 已过期或无效，请重新登录",
-	Forbidden:           "无权限访问该资源",
+	Success:            "成功",
+	SystemError:        "系统内部异常，请稍后重试",
+	ServerPanic:        "服务内部错误",
+	Unauthorized:       "未登录，请先登录",
+	TokenFormatInvalid: "认证格式错误，格式: Bearer <token>",
+	TokenExpired:       "Token 已过期或无效，请重新登录",
+	Forbidden:          "无权限访问该资源",
 	ResourceNotFound:    "请求的资源不存在",
-	DataConflict:        "数据冲突，请检查后重试",
+	DataConflict:       "数据冲突，请检查后重试",
 	ParamValidateFailed: "参数校验失败",
 	ParamRequired:       "缺少必填字段",
 	ParamFormat:         "字段格式错误",
 	ParamLengthExceeded: "字段长度超限",
 	ParamValueRange:     "字段值超出允许范围",
 	ParamEnumInvalid:    "字段值不在允许范围内",
-	DBError:             "数据库操作失败",
-	DBConnection:        "数据库连接失败",
-	EncryptFailed:       "密码处理失败",
-	TokenGenFailed:      "Token 生成失败",
-	LoginFailed:         "账号或密码错误",
-	RegisterFailed:      "注册失败，请稍后重试",
-	DuplicateNo:         "编号已被使用",
-	AccountDisabled:     "账号已被禁用，请联系管理员",
+	DBError:            "数据库操作失败",
+	DBConnection:       "数据库连接失败",
+	EncryptFailed:      "密码处理失败",
+	TokenGenFailed:     "Token 生成失败",
+	LoginFailed:        "账号或密码错误",
+	RegisterFailed:     "注册失败，请稍后重试",
+	DuplicateNo:        "编号已被使用",
+	AccountDisabled:    "账号已被禁用，请联系管理员",
 }
 
 // Msg 获取错误码对应的默认提示文案

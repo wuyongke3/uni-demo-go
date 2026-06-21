@@ -2,7 +2,6 @@ package handler
 
 import (
 	"fmt"
-	"net/http"
 
 	"unigo/database"
 	"unigo/errorcode"
@@ -81,16 +80,12 @@ func (h *AuthHandler) LecturerLogin(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, response.Response{
-		Code:    0,
-		Message: "登录成功",
-		Data: LoginResponse{
-			Token:    token,
-			UserID:   user.ID,
-			Username: user.Name,
-			Role:     "lecturer",
-			UserInfo: lecturerInfo(user),
-		},
+	response.SuccessWithMessage(c, "登录成功", LoginResponse{
+		Token:    token,
+		UserID:   user.ID,
+		Username: user.Name,
+		Role:     "lecturer",
+		UserInfo: lecturerInfo(user),
 	})
 }
 
@@ -128,16 +123,12 @@ func (h *AuthHandler) StudentLogin(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, response.Response{
-		Code:    0,
-		Message: "登录成功",
-		Data: LoginResponse{
-			Token:    token,
-			UserID:   user.ID,
-			Username: user.Name,
-			Role:     "student",
-			UserInfo: studentInfo(user),
-		},
+	response.SuccessWithMessage(c, "登录成功", LoginResponse{
+		Token:    token,
+		UserID:   user.ID,
+		Username: user.Name,
+		Role:     "student",
+		UserInfo: studentInfo(user),
 	})
 }
 
@@ -147,14 +138,10 @@ func GetCurrentUser(c *gin.Context) {
 	role, _ := c.Get(middleware.ContextRole)
 	username, _ := c.Get(middleware.ContextUserName)
 
-	c.JSON(http.StatusOK, response.Response{
-		Code:    0,
-		Message: "success",
-		Data: gin.H{
-			"user_id":  userID,
-			"role":     role,
-			"username": username,
-		},
+	response.Success(c, gin.H{
+		"user_id":  userID,
+		"role":     role,
+		"username": username,
 	})
 }
 
@@ -194,11 +181,7 @@ func (h *AuthHandler) LecturerRegister(c *gin.Context) {
 	entity.No = generateNo("T", entity.ID)
 	database.DB.Model(entity).Update("no", entity.No)
 
-	c.JSON(http.StatusOK, response.Response{
-		Code:    0,
-		Message: "注册成功",
-		Data:    lecturerInfo(entity),
-	})
+	response.SuccessWithMessage(c, "注册成功", lecturerInfo(entity))
 }
 
 // StudentRegister POST /auth/student/register - 学员注册
@@ -237,11 +220,7 @@ func (h *AuthHandler) StudentRegister(c *gin.Context) {
 	entity.No = generateNo("S", entity.ID)
 	database.DB.Model(entity).Update("no", entity.No)
 
-	c.JSON(http.StatusOK, response.Response{
-		Code:    0,
-		Message: "注册成功",
-		Data:    studentInfo(entity),
-	})
+	response.SuccessWithMessage(c, "注册成功", studentInfo(entity))
 }
 
 // ============================================================

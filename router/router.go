@@ -1,6 +1,7 @@
 package router
 
 import (
+	"net/http"
 	"unigo/config"
 	"unigo/handler"
 	"unigo/middleware"
@@ -14,9 +15,54 @@ import (
 	"unigo/router/lecturer"
 	"unigo/router/student"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
+
+// corsWriter 包装 gin.ResponseWriter，确保每次写入响应时都携带 CORS 头
+type corsWriter struct {
+	gin.ResponseWriter
+	headerWritten bool
+}
+
+func (w *corsWriter) Write(data []byte) (int, error) {
+	if !w.headerWritten {
+		w.setHeader()
+		w.headerWritten = true
+	}
+	return w.ResponseWriter.Write(data)
+}
+
+func (w *corsWriter) WriteHeader(code int) {
+	if !w.headerWritten {
+		w.setHeader()
+		w.headerWritten = true
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *corsWriter) setHeader() {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, Accept, X-Requested-With")
+	w.Header().Set("Access-Control-Expose-Headers", "Content-Length, Content-Type")
+}
+
+// corsMiddleware CORS 中间件 (包装 ResponseWriter + 处理 OPTIONS 预检)
+func CORSMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method == "OPTIONS" {
+			c.Header("Access-Control-Allow-Origin", "*")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, Accept, X-Requested-With")
+			c.Header("Access-Control-Max-Age", "43200")
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Writer = &corsWriter{ResponseWriter: c.Writer}
+		c.Next()
+	}
+}
 
 // SetupRouter 注册所有路由 (公开登录 + 鉴权保护业务接口)
 //
@@ -41,16 +87,6 @@ import (
 //	└── /admins                 ★ 需 Token 鉴权
 func SetupRouter(r *gin.Engine, cfg config.JWTConfig) {
 	api := r.Group("/api/v1")
-
-	// 全局 CORS 中间件 (允许跨域)
-	r.Use(cors.New(cors.Config{
-		AllowAllOrigins:  true, // 允许所有来源
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: false, // AllowAllOrigins=true 时必须为 false
-		MaxAge:           12 * 3600,
-	}))
 
 	// ============================================================
 	//  公开路由 (无需 Token)

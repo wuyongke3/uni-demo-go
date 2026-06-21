@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"net/http"
 	"reflect"
 	"sort"
 	"strconv"
@@ -175,7 +174,7 @@ func (h *CRUDEntity[T]) Delete(c *gin.Context) {
 	if len(ids) > 1 {
 		msg = "批量删除成功 (" + strconv.Itoa(len(ids)) + " 条)"
 	}
-	c.JSON(http.StatusOK, response.Response{Code: 0, Message: msg})
+	response.SuccessWithMessage(c, msg, nil)
 }
 
 // ============================================================
